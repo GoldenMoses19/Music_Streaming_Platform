@@ -443,6 +443,40 @@ Music_Platform::vote_on_change(&mut user, &mut change_proposal, true, &mut ctx);
 1. To vote on a change proposal:
    ```move
    Music_Platform::vote_on_change(&mut user, &mut change_proposal, true, &mut ctx);
+   
    ```
+   $ sui --version
+sui 1.22.0-0362997459
+
+### UNITTEST
+$ sui move test
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING sui_music_platform
+Running Move unit tests
+[ PASS    ] 0x0::sui_music_platform_tests::test_register_song
+[ PASS    ] 0x0::sui_music_platform_tests::test_distribute_royalties
+[ PASS    ] 0x0::sui_music_platform_tests::test_claim_royalties
+[ PASS    ] 0x0::sui_music_platform_tests::test_update_song_details
+[ PASS    ] 0x0::sui_music_platform_tests::test_revoke_song
+[ PASS    ] 0x0::sui_music_platform_tests::test_register_artist
+[ PASS    ] 0x0::sui_music_platform_tests::test_register_listener
+[ PASS    ] 0x0::sui_music_platform_tests::test_upload_track
+[ PASS    ] 0x0::sui_music_platform_tests::test_stream_track
+[ PASS    ] 0x0::sui_music_platform_tests::test_tip_artist
+[ PASS    ] 0x0::sui_music_platform_tests::test_create_playlist
+[ PASS    ] 0x0::sui_music_platform_tests::test_add_track_to_playlist
+[ PASS    ] 0x0::sui_music_platform_tests::test_get_playlist_details
+[ PASS    ] 0x0::sui_music_platform_tests::test_get_song_details
+[ PASS    ] 0x0::sui_music_platform_tests::test_get_track_details
+[ PASS    ] 0x0::sui_music_platform_tests::test_register_user
+[ PASS    ] 0x0::sui_music_platform_tests::test_get_user_details
+[ PASS    ] 0x0::sui_music_platform_tests::test_split_payments
+[ PASS    ] 0x0::sui_music_platform_tests::test_get_royalty_analytics
+[ PASS    ] 0x0::sui_music_platform_tests::test_add_feedback
+[ PASS    ] 0x0::sui_music_platform_tests::test_promote_track
+[ PASS    ] 0x0::sui_music_platform_tests::test_vote_on_change
+Test result: OK. Total tests: 22; passed: 22; failed: 0
+
 
 This documentation provides an overview of the functionalities and how to use the Music Platform module effectively. 
