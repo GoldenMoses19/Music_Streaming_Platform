@@ -496,12 +496,6 @@ To deploy the Music Platform module on the Sui blockchain:
     sui move build
     sui client publish --gas-budget <GAS_BUDGET>
     ```
-
-3. Run unit tests to verify the deployment:
-    ```bash
-    sui move test
-    ```
-
 This documentation provides an overview of the functionalities and how to use the Music Platform module effectively. For more detailed usage and examples, refer to the specific function implementations.
 
 
