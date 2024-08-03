@@ -445,10 +445,14 @@ Music_Platform::vote_on_change(&mut user, &mut change_proposal, true, &mut ctx);
    Music_Platform::vote_on_change(&mut user, &mut change_proposal, true, &mut ctx);
    
    ```
-   $ sui --version
-sui 1.22.0-0362997459
 
-### UNITTEST
+
+## UNITTEST
+
+```bash
+$ sui --version
+sui 1.2.7.0-0362997459
+
 $ sui move test
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
@@ -466,6 +470,8 @@ Running Move unit tests
 [ PASS    ] 0x0::sui_music_platform_tests::test_tip_artist
 [ PASS    ] 0x0::sui_music_platform_tests::test_create_playlist
 [ PASS    ] 0x0::sui_music_platform_tests::test_add_track_to_playlist
+
+
 [ PASS    ] 0x0::sui_music_platform_tests::test_get_playlist_details
 [ PASS    ] 0x0::sui_music_platform_tests::test_get_song_details
 [ PASS    ] 0x0::sui_music_platform_tests::test_get_track_details
@@ -477,6 +483,26 @@ Running Move unit tests
 [ PASS    ] 0x0::sui_music_platform_tests::test_promote_track
 [ PASS    ] 0x0::sui_music_platform_tests::test_vote_on_change
 Test result: OK. Total tests: 22; passed: 22; failed: 0
+```
+
+## Deployment
+
+To deploy the Music Platform module on the Sui blockchain:
+
+1. Ensure you have Sui CLI installed and configured.
+
+2. Build and deploy the module:
+    ```bash
+    sui move build
+    sui client publish --gas-budget <GAS_BUDGET>
+    ```
+
+3. Run unit tests to verify the deployment:
+    ```bash
+    sui move test
+    ```
+
+This documentation provides an overview of the functionalities and how to use the Music Platform module effectively. For more detailed usage and examples, refer to the specific function implementations.
 
 
 This documentation provides an overview of the functionalities and how to use the Music Platform module effectively. 
