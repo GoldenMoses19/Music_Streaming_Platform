@@ -11,6 +11,7 @@ module Music_Streaming::Music_Platform {
     const Error_InvalidListener: u64 = 3;
     const Error_NotOwner: u64 = 7;
     const Error_NotArtist: u64 = 11;
+    const Error_NotEnoughFunds: u64 = 12;
 
     /* Structs */
     public struct Song has key, store {
@@ -18,7 +19,8 @@ module Music_Streaming::Music_Platform {
         details: vector<u8>,
         owners: Table<address, u64>, // address of owners and their ownership share (in basis points)
         total_royalties: Balance<SUI>,
-        owner_list: vector<address> // Track owners separately for iteration
+        owner_list: vector<address>, // Track owners separately for iteration
+        promoted: bool
     }
 
     public struct Artist has key, store {
@@ -26,14 +28,16 @@ module Music_Streaming::Music_Platform {
         artist_address: address,
         name: vector<u8>,
         track_history: Table<u64, Track>,
-        track_list: vector<u64> // Track list separately for iteration
+        track_list: vector<u64>, // Track list separately for iteration
+        subscribers: vector<address> // List of subscribers to the artist
     }
 
     public struct Listener has key, store {
         id: UID,
         listener_address: address,
         escrow: Balance<SUI>,
-        name: vector<u8>
+        name: vector<u8>,
+        subscribed_artists: vector<address> // List of artists the listener is subscribed to
     }
 
     public struct Track has key, store {
@@ -65,6 +69,21 @@ module Music_Streaming::Music_Platform {
 
     /* Functions */
 
+    // Utility function to distribute payments based on ownership shares
+    fun distribute_payment(owners: &Table<address, u64>, owner_list: &vector<address>, mut payment: Coin<SUI>, ctx: &mut TxContext) {
+        let total_amount = coin::value(&payment);
+        let length = vector::length(owner_list);
+        let mut i = 0;
+        while (i < length) {
+            let owner = *vector::borrow(owner_list, i);
+            let share = *table::borrow(owners, owner);
+            let owner_payment = (total_amount * share) / 10000;
+            let coin = coin::split(&mut payment, owner_payment, ctx);
+            transfer::public_transfer(coin, owner);
+            i = i + 1;
+        };
+    }
+
     // Function to register a new Song
     public fun register_song(
         details: vector<u8>,
@@ -94,24 +113,14 @@ module Music_Streaming::Music_Platform {
             details: details,
             owners: owners_table,
             total_royalties: balance::zero(),
-            owner_list: owner_list
+            owner_list: owner_list,
+            promoted: false
         }
     }
 
     // Function to distribute royalties to song owners
     public fun distribute_royalties(song: &mut Song, mut payment: Coin<SUI>, ctx: &mut TxContext) {
-        let total_amount = coin::value(&payment);
-        let length = vector::length(&song.owner_list);
-        let mut i = 0;
-        while (i < length) {
-            let owner = *vector::borrow(&song.owner_list, i);
-            let share = *table::borrow(&song.owners, owner);
-            let owner_payment = (total_amount * share) / 10000;
-            let coin = coin::split(&mut payment, owner_payment, ctx);
-            transfer::public_transfer(coin, owner);
-            i = i + 1;
-        };
-        balance::join(&mut song.total_royalties, coin::into_balance(payment));
+        distribute_payment(&song.owners, &song.owner_list, payment, ctx);
     }
 
     // Function to claim royalties for a song owner
@@ -135,8 +144,21 @@ module Music_Streaming::Music_Platform {
     public fun revoke_song(song: &mut Song, ctx: &mut TxContext) {
         let owner_address = tx_context::sender(ctx);
         assert!(table::contains(&song.owners, owner_address), Error_NotOwner);
-        // Logic to check majority consensus and revoke the song
-        // Placeholder for consensus logic
+
+        let length = vector::length(&song.owner_list);
+        let mut yes_votes = 0;
+        let mut i = 0;
+        while (i < length) {
+            let owner = *vector::borrow(&song.owner_list, i);
+            if owner == owner_address {
+                yes_votes = yes_votes + 1;
+            }
+            i = i + 1;
+        };
+        // If the majority of owners vote to revoke, the song is deleted
+        if yes_votes > (length / 2) {
+            object::delete(song.id);
+        }
     }
 
     // Function to register a new Artist
@@ -146,7 +168,8 @@ module Music_Streaming::Music_Platform {
             artist_address: artist_address,
             name: name,
             track_history: table::new<u64, Track>(ctx),
-            track_list: vector::empty<u64>()
+            track_list: vector::empty<u64>(),
+            subscribers: vector::empty<address>()
         }
     }
 
@@ -156,13 +179,14 @@ module Music_Streaming::Music_Platform {
             id: object::new(ctx),
             listener_address: listener_address,
             escrow: balance::zero(),
-            name: name
+            name: name,
+            subscribed_artists: vector::empty<address>()
         }
     }
 
     // Function to upload a new track
     public fun upload_track(artist: &mut Artist, track_details: vector<u8>, track_id: u64, ctx: &mut TxContext) {
-        assert!(tx_context::sender(ctx) == artist.artist_address, Error_InvalidOwner);
+        assert!(tx_context::sender(ctx) == artist.artist_address, Error_NotArtist);
         let track = Track {
             id: object::new(ctx),
             details: track_details,
@@ -212,8 +236,7 @@ module Music_Streaming::Music_Platform {
         let first_track_id = *vector::borrow(&playlist.track_list, 0);
         let is_first_track_promoted = table::borrow(&playlist.tracks, first_track_id).promoted;
         (playlist_name, first_track_id, is_first_track_promoted)
-}
-
+    }
 
     // Function to get song details
     public fun get_song_details(song: &Song) : (vector<u8>, &Balance<SUI>) {
@@ -239,29 +262,6 @@ module Music_Streaming::Music_Platform {
         user.details
     }
 
-    // Function to split payments and shares dynamically
-    public fun split_payments(song: &mut Song, mut payments: Coin<SUI>, ctx: &mut TxContext) {
-        let length = vector::length(&song.owner_list);
-        let mut i = 0;
-        while (i < length) {
-            let owner = *vector::borrow(&song.owner_list, i);
-            let share = *table::borrow(&song.owners, owner);
-            let owner_payment = (coin::value(&payments) * share) / 10000;
-            let coin = coin::split(&mut payments, owner_payment, ctx);
-            transfer::public_transfer(coin, owner);
-            i = i + 1;
-        };
-        // Ensure the remaining 'payments' are properly joined into 'song.total_royalties'
-        balance::join(&mut song.total_royalties, coin::into_balance(payments));
-    }
-
-    // Function to provide detailed analytics on royalties
-    public fun get_royalty_analytics(song: &Song) : (u64, u64) {
-        let total_royalties = balance::value(&song.total_royalties);
-        let length = vector::length(&song.owner_list);
-        (total_royalties, length)
-    }
-
     // Function to enable user interaction and feedback
     public fun add_feedback(listener: &mut Listener, track: &mut Track, feedback: vector<u8>, ctx: &mut TxContext) {
         assert!(tx_context::sender(ctx) == listener.listener_address, Error_InvalidListener);
@@ -273,8 +273,17 @@ module Music_Streaming::Music_Platform {
         assert!(tx_context::sender(ctx) == artist.artist_address, Error_NotArtist);
         let track = table::borrow_mut(&mut artist.track_history, track_id);
         track.promoted = true;
-        // Logic to actually promote the track
-        // For instance, the platform could prioritize this track in recommendations
+        // Additional logic to promote the track on the platform
+    }
+
+    // Function to allow listeners to subscribe to an artist
+    public fun subscribe_to_artist(listener: &mut Listener, artist: &mut Artist, ctx: &mut TxContext) {
+        let subscription_fee = 500; // arbitrary fee for subscription
+        assert!(balance::value(&listener.escrow) >= subscription_fee, Error_NotEnoughFunds);
+        let coin = coin::take(&mut listener.escrow, subscription_fee, ctx);
+        transfer::public_transfer(coin, artist.artist_address);
+        vector::push_back(&mut artist.subscribers, listener.listener_address);
+        vector::push_back(&mut listener.subscribed_artists, artist.artist_address);
     }
 
     // Function for governance and voting
@@ -282,7 +291,8 @@ module Music_Streaming::Music_Platform {
         assert!(tx_context::sender(ctx) == user.user_address, Error_InvalidOwner);
         table::add(&mut change_proposal.votes, user.user_address, vote);
         vector::push_back(&mut change_proposal.voter_list, user.user_address);
-        // Logic for determining if the proposal is approved
+
+        // Determine if the proposal is approved
         let length = vector::length(&change_proposal.voter_list);
         let mut yes_votes = 0;
         let mut no_votes = 0;
